@@ -6,7 +6,7 @@ import lombok.Data;
 public class PolicySubObject {
 
     private String name;
-    private long sumInsured;
+    private double sumInsured;
     private RiskType riskType;
 
 }

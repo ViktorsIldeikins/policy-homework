@@ -9,6 +9,6 @@ public class Policy {
 
     private String policyNumber;
     private List<PolicyObject> policyObjects;
-    private long premium;
+    private double premium;
 
 }
