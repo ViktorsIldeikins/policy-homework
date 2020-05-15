@@ -4,7 +4,6 @@ import com.proofit.policy.premium.dto.Policy;
 import com.proofit.policy.premium.dto.PolicyObject;
 import com.proofit.policy.premium.dto.PolicySubObject;
 import com.proofit.policy.premium.dto.RiskType;
-import com.proofit.policy.premium.exception.UnknownRiskTypeException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +17,6 @@ import static com.proofit.policy.premium.dto.RiskType.FIRE;
 import static com.proofit.policy.premium.dto.RiskType.WATER;
 import static java.util.Arrays.asList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @ExtendWith(SpringExtension.class)
 @ContextConfiguration(classes = {Application.class})
@@ -29,7 +27,7 @@ class PremiumCalculatorTest {
     private PremiumCalculator premiumCalculator;
 
     @Test
-    void happyPath_1() {
+    void fireSumBelowLimit_waterSumBelowLimit() {
         Policy policy = new Policy();
         PolicyObject policyObject = new PolicyObject();
         policy.setPolicyObjects(Collections.singletonList(policyObject));
@@ -39,7 +37,7 @@ class PremiumCalculatorTest {
     }
 
     @Test
-    void happyPath_2() {
+    void fireSumExceeded_waterSumExceeded() {
         Policy policy = new Policy();
         PolicyObject policyObject = new PolicyObject();
         policy.setPolicyObjects(Collections.singletonList(policyObject));
@@ -49,26 +47,39 @@ class PremiumCalculatorTest {
     }
 
     @Test
+    void multipleFireRiskTypes() {
+        Policy policy = new Policy();
+        PolicyObject policyObject = new PolicyObject();
+        policy.setPolicyObjects(Collections.singletonList(policyObject));
+        policyObject.setSubObjects(asList(createSubObject(FIRE, 70), createSubObject(FIRE, 50)));
+        premiumCalculator.calculate(policy);
+        assertEquals(2.76, policy.getPremium());
+    }
+
+    @Test
+    void multipleWaterRiskTypes() {
+        Policy policy = new Policy();
+        PolicyObject policyObject = new PolicyObject();
+        policy.setPolicyObjects(Collections.singletonList(policyObject));
+        policyObject.setSubObjects(asList(createSubObject(WATER, 7), createSubObject(WATER, 8)));
+        premiumCalculator.calculate(policy);
+        assertEquals(0.75, policy.getPremium());
+    }
+
+    @Test
     void noObjects_expectPremium0() {
         Policy policy = new Policy();
         premiumCalculator.calculate(policy);
         assertEquals(0, policy.getPremium());
     }
 
+
     @Test
     void noSubObjects_expectPremium0() {
         Policy policy = new Policy();
+        policy.setPolicyObjects(asList(new PolicyObject()));
         premiumCalculator.calculate(policy);
         assertEquals(0, policy.getPremium());
-    }
-
-    @Test
-    void riskTypeNull_exceptionExpected(){
-        Policy policy = new Policy();
-        PolicyObject policyObject = new PolicyObject();
-        policy.setPolicyObjects(Collections.singletonList(policyObject));
-        policyObject.setSubObjects(asList(createSubObject(FIRE, 500), createSubObject(null, 100)));
-        assertThrows(UnknownRiskTypeException.class, () -> premiumCalculator.calculate(policy));
     }
 
     ///////////////////////////////////////////////////

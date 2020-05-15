@@ -1,7 +1,6 @@
 package com.proofit.policy.premium;
 
 import com.proofit.policy.premium.dto.Policy;
-import com.proofit.policy.premium.dto.PolicyObject;
 import com.proofit.policy.premium.dto.PolicySubObject;
 import com.proofit.policy.premium.dto.RiskType;
 import com.proofit.policy.premium.exception.UnknownRiskTypeException;
@@ -9,8 +8,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.util.Collections;
-import java.util.Optional;
+import java.util.List;
+
+import static java.util.Collections.emptyList;
 
 @Component
 @Slf4j
@@ -30,34 +30,32 @@ public class PremiumCalculator {
     private double waterInsuredSumThreshold;
 
     Policy calculate(Policy policy){
-        double premium = Optional.ofNullable(policy.getPolicyObjects())
-                .orElse(Collections.emptyList())
-                .stream()
-                .map(this::calculateObjectPremium)
-                .reduce((double) 0, Double::sum);
-        policy.setPremium(premium);
+        double totalPremium = 0;
+
+        for (RiskType riskType : RiskType.values()) {
+            double sumInsured = emptyIfNull(policy.getPolicyObjects())
+                    .stream()
+                    .flatMap(policyObject -> emptyIfNull(policyObject.getSubObjects()).stream())
+                    .filter(subObject -> riskType.equals(subObject.getRiskType()))
+                    .mapToDouble(PolicySubObject::getSumInsured)
+                    .sum();
+            double premiumForRiskType = calculatePremiumForRiskType(riskType, sumInsured);
+            totalPremium += premiumForRiskType;
+        }
+
+        policy.setPremium(totalPremium);
         return policy;
     }
 
-    private double calculateObjectPremium(PolicyObject policyObject) {
-        return Optional.ofNullable(policyObject.getSubObjects())
-                .orElse(Collections.emptyList())
-                .stream()
-                .map(this::calculateSubObjectPremium)
-                .reduce((double) 0, Double::sum);
-    }
-
-    private double calculateSubObjectPremium(PolicySubObject subObject) {
-        double sumInsured = subObject.getSumInsured();
-        RiskType riskType = subObject.getRiskType();
+    private double calculatePremiumForRiskType(RiskType riskType, double insuredSum) {
         if (riskType == null) {
             log.error("Risk type cannot be null");
             throw new UnknownRiskTypeException("Could not resolve risk type: null");
         }
         switch (riskType) {
-            case FIRE: return sumInsured * (sumInsured > fireInsuredSumLimit ?
+            case FIRE: return insuredSum * (insuredSum > fireInsuredSumLimit ?
                     fireExceededCoef : fireDefaultCoef);
-            case WATER: return sumInsured * (sumInsured >= waterInsuredSumThreshold ?
+            case WATER: return insuredSum * (insuredSum >= waterInsuredSumThreshold ?
                     waterExceededCoef : waterDefaultCoef);
             default: {
                 log.error("Could not calculate premium for unknown risk type: {}; Returning 0.", riskType);
@@ -65,6 +63,10 @@ public class PremiumCalculator {
             }
 
         }
+    }
+
+    private <T> List<T> emptyIfNull(List<T> list) {
+        return list == null ? emptyList() : list;
     }
 
 }
