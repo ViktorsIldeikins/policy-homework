@@ -33,29 +33,30 @@ public class PremiumCalculator {
         double totalPremium = 0;
 
         for (RiskType riskType : RiskType.values()) {
-            double sumInsured = emptyIfNull(policy.getPolicyObjects())
+            double sumInsuredForRiskType = emptyIfNull(policy.getPolicyObjects())
                     .stream()
                     .flatMap(policyObject -> emptyIfNull(policyObject.getSubObjects()).stream())
                     .filter(subObject -> riskType.equals(subObject.getRiskType()))
                     .mapToDouble(PolicySubObject::getSumInsured)
                     .sum();
-            double premiumForRiskType = calculatePremiumForRiskType(riskType, sumInsured);
-            totalPremium += premiumForRiskType;
+            totalPremium += calculatePremiumForRiskType(riskType, sumInsuredForRiskType);
         }
 
+        log.info("Calculated premium for policy. Policy number: {}, premium: {}",
+                policy.getPolicyNumber(), totalPremium);
         policy.setPremium(totalPremium);
         return policy;
     }
 
-    private double calculatePremiumForRiskType(RiskType riskType, double insuredSum) {
+    private double calculatePremiumForRiskType(RiskType riskType, double sumInsured) {
         if (riskType == null) {
             log.error("Risk type cannot be null");
             throw new UnknownRiskTypeException("Could not resolve risk type: null");
         }
         switch (riskType) {
-            case FIRE: return insuredSum * (insuredSum > fireInsuredSumLimit ?
+            case FIRE: return sumInsured * (sumInsured > fireInsuredSumLimit ?
                     fireExceededCoef : fireDefaultCoef);
-            case WATER: return insuredSum * (insuredSum >= waterInsuredSumThreshold ?
+            case WATER: return sumInsured * (sumInsured >= waterInsuredSumThreshold ?
                     waterExceededCoef : waterDefaultCoef);
             default: {
                 log.error("Could not calculate premium for unknown risk type: {}; Returning 0.", riskType);
